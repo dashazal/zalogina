@@ -1,121 +1,164 @@
 [
     {
-        "id": "watch_log",
-        "type": "watch",
-        "z": "flow1",
-        "name": "Следить за log.txt",
-        "files": "data/log.txt",
-        "recursive": "false",
-        "x": 170,
-        "y": 120,
-        "wires": [["read_log"]]
-    },
-    {
-        "id": "inject_manual",
+        "id": "c0e89aaae53184e5",
         "type": "inject",
-        "z": "flow1",
-        "name": "Загрузить вручную",
-        "props": [{"p": "payload"}],
+        "z": "7197e169396119ce",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
         "repeat": "",
         "crontab": "",
         "once": false,
         "onceDelay": 0.1,
         "topic": "",
-        "payload": "true",
-        "payloadType": "bool",
-        "x": 170,
-        "y": 180,
-        "wires": [["read_log"]]
+        "payload": "",
+        "payloadType": "date",
+        "x": 460,
+        "y": 460,
+        "wires": [
+            [
+                "5ee29cf48587e9e9"
+            ]
+        ]
     },
     {
-        "id": "read_log",
-        "type": "file in",
-        "z": "flow1",
-        "name": "Прочитать log.txt",
-        "filename": "data/log.txt",
-        "filenameType": "str",
-        "format": "utf8",
-        "chunk": false,
-        "sendError": false,
-        "encoding": "none",
-        "x": 380,
-        "y": 150,
-        "wires": [["process_data"]]
+        "id": "400fba65401fd32b",
+        "type": "watch",
+        "z": "7197e169396119ce",
+        "name": "data\\log.txt",
+        "files": "C:\\Users\\10240803\\zalogina\\data\\log.txt",
+        "recursive": "",
+        "x": 440,
+        "y": 580,
+        "wires": [
+            [
+                "5ee29cf48587e9e9"
+            ]
+        ]
     },
     {
-        "id": "process_data",
+        "id": "610f312c2f59468e",
         "type": "function",
-        "z": "flow1",
-        "name": "Лог в SQL + FAULT",
-        "func": "const T = 2;\nconst RANGES = { s1: [0, 100], s2: [-20, 80], s3: [2, 400] };\n\nconst text = String(msg.payload).replace(/^\\uFEFF/, '');\nconst sql = [];\n\ntext.split(/\\r?\\n/).forEach(raw => {\n    const line = raw.trim();\n    if (!line) return;\n\n    const parts = line.split(' ');\n    const kind = parts[0];\n    const f = {};\n\n    parts.slice(1).forEach(p => {\n        const kv = p.split('=');\n        f[kv[0]] = kv[1];\n    });\n\n    const n = parseInt(f.n);\n    if (isNaN(n)) return;\n    const t = n * T;\n\n    if (kind === 'DATA') {\n        ['s1', 's2', 's3'].forEach(s => {\n            const v = parseFloat(f[s]);\n            if (isNaN(v)) return;\n\n            sql.push(`INSERT INTO readings(n,t_s,sensor,value) VALUES(${n},${t},'${s}',${v});`);\n\n            const min = RANGES[s][0];\n            const max = RANGES[s][1];\n            if (v < min || v > max) {\n                sql.push(`INSERT INTO events(n,t_s,type,message) VALUES(${n},${t},'FAULT','датчик ${s} вне диапазона');`);\n            }\n        });\n    } else if (kind === 'EVENT') {\n        if (f.type === 'THRESHOLD' || f.type === 'NORMAL') {\n            sql.push(`INSERT INTO events(n,t_s,type,message) VALUES(${n},${t},'${f.type}','');`);\n        }\n    }\n});\n\nconst head = 'BEGIN;\\nDELETE FROM readings;\\nDELETE FROM events;\\n' + \"DELETE FROM sqlite_sequence WHERE name IN ('readings','events');\\n\";\nreturn [null, { payload: head + sql.join('\\n') + '\\nCOMMIT;\\n' }];\n",
-        "outputs": 2,
-        "timeout": "",
+        "z": "7197e169396119ce",
+        "name": "function 1",
+        "func": "const T = 2;\nconst RANGES = { s1: [0, 100], s2: [-20, 80], s3: [2, 400] };\n\nconst text = String(msg.payload).replace(/^\\uFEFF/, '');\nconst sql = [];\n\ntext.split(/\\r?\\n/).forEach(raw => {\n    const line = raw.trim();\n    if (!line) return;\n\n    const parts = line.split(' ');\n    const kind = parts[0];\n\n    const f = {};\n    parts.slice(1).forEach(p => {\n        const kv = p.split('=');\n        f[kv[0]] = kv[1];\n    });\n\n    const n = parseInt(f.n);\n    if (isNaN(n)) return;\n    const t = n * T;\n\n    if (kind === 'DATA') {\n        ['s1', 's2', 's3'].forEach(s => {\n            const v = parseFloat(f[s]);\n            if (isNaN(v)) return;\n            sql.push(`INSERT INTO readings(n,t_s,sensor,value) VALUES(${n},${t},'${s}',${v});`);\n            const r = RANGES[s];\n            if (v < r[0] || v > r[1]) {\n                sql.push(`INSERT INTO events(n,t_s,type,message) VALUES(${n},${t},'FAULT','датчик ${s} вне диапазона');`);\n            }\n        });\n    } else if (kind === 'EVENT') {\n        if (f.type === 'THRESHOLD' || f.type === 'NORMAL') {\n            sql.push(`INSERT INTO events(n,t_s,type,message) VALUES(${n},${t},'${f.type}',NULL);`);\n        }\n    }\n});\n\nif (sql.length === 0) {\n    node.warn('Нет команд');\n    return [null, null];\n}\n\nconst head = 'BEGIN;\\nDELETE FROM readings;\\nDELETE FROM events;\\n' +\n    \"DELETE FROM sqlite_sequence WHERE name IN ('readings','events');\\n\";\nreturn [null, { payload: head + sql.join('\\n') + '\\nCOMMIT;\\n' }];",
+        "outputs": 1,
+        "timeout": 0,
         "noerr": 0,
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 610,
-        "y": 150,
-        "wires": [[], ["write_sql"]]
+        "x": 640,
+        "y": 520,
+        "wires": [
+            [
+                "f7c022135b7cf24a"
+            ]
+        ]
     },
     {
-        "id": "write_sql",
-        "type": "file",
-        "z": "flow1",
-        "name": "Записать load.sql",
-        "filename": "db/load.sql",
-        "filenameType": "str",
-        "appendNewline": true,
-        "createDir": true,
-        "overwriteFile": "true",
-        "encoding": "none",
-        "x": 840,
-        "y": 180,
-        "wires": [["exec_sqlite"]]
-    },
-    {
-        "id": "exec_sqlite",
+        "id": "16c4b5d5230d698e",
         "type": "exec",
-        "z": "flow1",
-        "command": "sqlite3 db/variant.db \".read db/schema.sql\" \".read db/load.sql\"",
+        "z": "7197e169396119ce",
+        "command": "\"C:\\Users\\10240803\\tools\\sqlite\\sqlite3.exe\" \"C:\\Users\\10240803\\zalogina\\db\\variant.db\" \".read C:\\Users\\10240803\\zalogina\\db\\schema.sql\" \".read C:\\Users\\10240803\\zalogina\\db\\load.sql\"",
         "addpay": "",
         "append": "",
         "useSpawn": "false",
         "timer": "",
+        "winHide": false,
         "oldrc": false,
-        "name": "Загрузить в SQLite",
-        "x": 1080,
-        "y": 180,
-        "wires": [["debug_ok", "debug_err"], ["debug_err", "debug_ok"], []]
+        "name": "sqlite3.exe",
+        "x": 950,
+        "y": 520,
+        "wires": [
+            [
+                "a283a8e609242fca"
+            ],
+            [
+                "37627f2d9d8b0887"
+            ],
+            []
+        ]
     },
     {
-        "id": "debug_ok",
+        "id": "a283a8e609242fca",
         "type": "debug",
-        "z": "flow1",
-        "name": "Успех",
-        "active": true,
+        "z": "7197e169396119ce",
+        "name": "debug 1",
+        "active": false,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
         "complete": "payload",
         "targetType": "msg",
-        "x": 1280,
-        "y": 150,
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 460,
         "wires": []
     },
     {
-        "id": "debug_err",
+        "id": "37627f2d9d8b0887",
         "type": "debug",
-        "z": "flow1",
-        "name": "Ошибка",
-        "active": true,
+        "z": "7197e169396119ce",
+        "name": "debug 2",
+        "active": false,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
         "complete": "payload",
         "targetType": "msg",
-        "x": 1290,
-        "y": 210,
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1120,
+        "y": 560,
         "wires": []
+    },
+    {
+        "id": "f7c022135b7cf24a",
+        "type": "file",
+        "z": "7197e169396119ce",
+        "name": "db\\load.sql",
+        "filename": "C:\\Users\\10240803\\zalogina\\db\\load.sql",
+        "filenameType": "str",
+        "appendNewline": false,
+        "createDir": true,
+        "overwriteFile": "true",
+        "encoding": "none",
+        "x": 790,
+        "y": 520,
+        "wires": [
+            [
+                "16c4b5d5230d698e"
+            ]
+        ]
+    },
+    {
+        "id": "5ee29cf48587e9e9",
+        "type": "file in",
+        "z": "7197e169396119ce",
+        "name": "C:\\Users\\10240803\\zalogina\\data\\log_fault.txt",
+        "filename": "C:\\Users\\10240803\\zalogina\\data\\log.txt",
+        "filenameType": "str",
+        "format": "utf8",
+        "chunk": false,
+        "sendError": false,
+        "encoding": "utf8",
+        "allProps": false,
+        "x": 390,
+        "y": 520,
+        "wires": [
+            [
+                "610f312c2f59468e"
+            ]
+        ],
+        "info": "DATA n=1 s1=50 s2=22.5 s3=100\r\nEVENT n=1 type=THRESHOLD"
     }
 ]
