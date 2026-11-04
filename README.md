@@ -32,7 +32,7 @@ zalogina/
 ├── .gitignore
 │
 ├── firmware/              
-│   └── variant_10.ino
+│   └── sketch.ino
 │
 ├── db/                    
 │   ├── schema.sql         
@@ -54,7 +54,9 @@ zalogina/
     ├── schematic.pdf      
     ├── scheme.png         
     ├── algorithm.png      
-    ├── bom.csv            
+    ├── bom.csv
+    ├── er-diagram.png
+    ├── flow.png     
     ├── пояснительная_записка.pdf
     └── инструкция_пользователя.pdf
 ```
